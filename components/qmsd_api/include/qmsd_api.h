@@ -11,6 +11,8 @@
 #include "mqtt_client.h"
 #include "qmsd_wifi.h"
 #include "qmsd_notifier.h"
+#include "esp_http_server.h"
+
 
 /* qmsd base */
 enum
@@ -195,5 +197,10 @@ int qmsd_mqtt_stop(void);
 int qmsd_mqtt_pub(const char *topic, const char *data, int len, const int qos, const int retain);
 int qmsd_mqtt_sub(const char *topic, int qos);
 int qmsd_mqtt_unsub(const char *topic);
+
+/*qmsd http server*/
+
+bool http_server_enable_flag;
+void qmsd_server_init(bool local_config_flag);
 
 #endif

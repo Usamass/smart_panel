@@ -26,20 +26,14 @@
 #include "qmsd_screen_config.h"
 #include "qmsd_version.h"
 #include "qmsd_mod.h"
+#include "qmsd_api.h"
+#include "qmsd_wifi.h"
+#include "qmsd_notifier.h"
+#include <esp_log.h>
 
-
-/*********************
- *      DEFINES
- *********************/
-#define TAG "main"
-
-/**********************
- *  STATIC PROTOTYPES
- **********************/
-
-/**********************
- *   APPLICATION MAIN
- **********************/
+#define TAG "MAIN"
+#define NON_BLOCKING_SCAN 1
+#define LOCAL_HTTP_SERVER 1
 
 void qmsd_ui_init_cb(void)
 {
@@ -52,20 +46,48 @@ void qmsd_ui_init_cb(void)
     qmsd_ui_entry();
 }
 
-extern void qmsd_test_init(void);
+
+static int __qmsd_nb_func(struct qmsd_notifier_block *nb, unsigned int action, void *data)
+{
+    struct qmsd_wifi_scan_res* scan_res;
+    if (action == QMSD_WIFI_STA_GOT_IP) {
+        ESP_LOGI(TAG , "GOT_IP_CALLBACK\n");
+    }else if (action == QMSD_WIFI_SCAN_DONE) {
+        scan_res = (struct qmsd_wifi_scan_res*)data;
+        for (int i = 0 ; i < scan_res->number ; i++) {
+            ESP_LOGI(TAG , "AP_SSID:%s\n" , scan_res->ap_info[i].ssid);
+        }
+
+    }
+
+    return QMSD_NOTIFY_OK;
+}
+
+static struct qmsd_notifier_block g_nb = {
+    .notifier_call = __qmsd_nb_func,
+};
 
 void app_main(void)
 {
+    
     printf("version: %s\n", QMSD_VERSION);
     qmsd_storage_init();
 
     qmsd_main_msgque_init(16);
-    esp_event_loop_create_default();
     qmsd_mod_init();
+    qmsd_notifier_register(&g_nb);
 
-    qmsd_test_init();
+    // smart_wifi_init();
+    // qmsd_wifi_set_mode(WIFI_MODE_AP);
+    // qmsd_wifi_ap_config("esp32" , "esp32#1212");
+    qmsd_server_init(LOCAL_HTTP_SERVER);
+
+    // qmsd_wifi_scan(NULL, NON_BLOCKING_SCAN);
+    //qmsd_wifi_sta_config("test-ssid", "test-pwd111", NULL);
+
     qmsd_set_init_cb(qmsd_ui_init_cb);
 
-    qmsd_gui_init(0,DIR_INPUT);
+    qmsd_gui_init(0, DIR_INPUT);
     qmsd_control_init();
 }
+

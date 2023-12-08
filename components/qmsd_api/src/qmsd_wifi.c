@@ -3,15 +3,17 @@
 #include "freertos/event_groups.h"
 #include "freertos/queue.h"
 #include "esp_system.h"
-#include "esp_event.h"
+// #include "esp_event.h"
 #include "esp_log.h"
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "lwip/sockets.h"
-
+#include "nvs_flash.h"
 #include "qmsd_api.h"
 #include "qmsd_wifi.h"
 #include "qmsd_notifier.h"
+
+
 
 #define QMSD_SCAN_LIST_MAX_SIZE 128
 
@@ -19,16 +21,24 @@
 #define WIFI_FAIL_BIT BIT1
 #define SARTCONFIG_DONE_BIT BIT2
 
+#define EXAMPLE_ESP_WIFI_SSID "device"
+#define  EXAMPLE_ESP_WIFI_PASS "device#1212"
+
 #define QMSD_WIFI_CONFIG_LEN    (sizeof(wifi_config_t) + 1)
 
 extern esp_err_t qmsd_storage_get_u8(const char *namespace, const char *key, uint8_t *value);
 extern esp_err_t qmsd_storage_set_u8(const char *namespace, const char* key,uint8_t input);
 extern esp_err_t qmsd_storage_set_blob(const char *name, const char *key, void *data, size_t length);
 extern esp_err_t qmsd_storage_get_blob(const char *name, const char *key, void *data, size_t length);
+extern httpd_handle_t qmsd_start_webserver(void);
+extern httpd_handle_t server;
+
+
 
 static esp_err_t __qmsd_wifi_connect(void);
 static const char *TAG = "QMSD_WIFI";
 static EventGroupHandle_t qmsd_wifi_event_group = NULL;
+static EventGroupHandle_t s_wifi_event_group = NULL;
 
 static TaskHandle_t sc_task_handle = NULL;
 
@@ -103,6 +113,7 @@ static void __qmsd_event_handler(void *arg, esp_event_base_t event_base,
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
     {
         ESP_LOGI(TAG, "WIFI_EVENT_STA_START");
+        // esp_wifi_connect();
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED)
     {
@@ -126,7 +137,7 @@ static void __qmsd_event_handler(void *arg, esp_event_base_t event_base,
             {
                 retry_num = 0;
                 qmsd_notifier_call_nolock(QMSD_WIFI_STA_DISCONNECT, event_data);
-                xEventGroupSetBits(qmsd_wifi_event_group, WIFI_FAIL_BIT);
+                xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
                 ESP_LOGW(TAG, "connect to the AP fail");
             }
         }
@@ -158,7 +169,7 @@ static void __qmsd_event_handler(void *arg, esp_event_base_t event_base,
                     ESP_LOGI(TAG, "retry connect to the AP after 10s");
                 }
                 qmsd_notifier_call_nolock(QMSD_WIFI_STA_DISCONNECT, event_data);
-                xEventGroupSetBits(qmsd_wifi_event_group, WIFI_FAIL_BIT);
+                xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
                 ESP_LOGW(TAG, "disconnect to the AP %d", reason);
             }
         }
@@ -166,8 +177,8 @@ static void __qmsd_event_handler(void *arg, esp_event_base_t event_base,
         {
             ESP_LOGW(TAG, "disconnect to the AP");
             qmsd_notifier_call_nolock(QMSD_WIFI_STA_DISCONNECT, event_data);
-            xEventGroupClearBits(qmsd_wifi_event_group, WIFI_CONNECTED_BIT);
-            xEventGroupSetBits(qmsd_wifi_event_group, WIFI_FAIL_BIT);
+            xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
@@ -178,13 +189,17 @@ static void __qmsd_event_handler(void *arg, esp_event_base_t event_base,
             esp_timer_delete(wifi_connect_timer);
             wifi_connect_timer = NULL;
         }
+        if (http_server_enable_flag) {
+            qmsd_start_webserver();
+
+        }
 
         qmsd_notifier_call_nolock(QMSD_WIFI_STA_GOT_IP, event_data);
         retry_num = 0;
         wifi_state = QMSD_WIFI_GOT_IP;
-
-        xEventGroupClearBits(qmsd_wifi_event_group, WIFI_FAIL_BIT);
-        xEventGroupSetBits(qmsd_wifi_event_group, WIFI_CONNECTED_BIT);
+        ESP_LOGI(TAG, "GOT_IP_ADDRESS_EVENT\n");
+        xEventGroupClearBits(s_wifi_event_group, WIFI_FAIL_BIT);
+        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE)
     {
@@ -257,7 +272,12 @@ static void __qmsd_event_handler(void *arg, esp_event_base_t event_base,
     }
     else if (event_base == SC_EVENT && event_id == SC_EVENT_SEND_ACK_DONE)
     {
-        xEventGroupSetBits(qmsd_wifi_event_group, SARTCONFIG_DONE_BIT);
+        xEventGroupSetBits(s_wifi_event_group, SARTCONFIG_DONE_BIT);
+    }
+    else if (event_id == WIFI_EVENT_AP_START) {
+        esp_netif_ip_info_t if_info;
+        ESP_ERROR_CHECK(esp_netif_get_ip_info(esp_netif_ap, &if_info));
+        ESP_LOGI(TAG, "Server IP address:" IPSTR, IP2STR(&if_info.ip));
     }
     else if (event_id == WIFI_EVENT_AP_STACONNECTED)
     {
@@ -451,6 +471,53 @@ esp_err_t qmsd_wifi_save_config(wifi_mode_t mode, wifi_interface_t interface)
     return err;
 }
 
+void smart_wifi_init()
+{
+    //Initialize NVS
+    qmsd_nvs_init();
+
+    ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
+    s_wifi_event_group = xEventGroupCreate();
+
+    ESP_ERROR_CHECK(esp_netif_init());
+
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    esp_netif_sta = esp_netif_create_default_wifi_sta();
+    
+    esp_netif_ap = esp_netif_create_default_wifi_ap();
+
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+    esp_event_handler_instance_t instance_any_id;
+    esp_event_handler_instance_t instance_got_ip;
+    esp_event_handler_instance_t instance_any_sc;
+
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+                                                        ESP_EVENT_ANY_ID,
+                                                        &__qmsd_event_handler,
+                                                        NULL,
+                                                        &instance_any_id));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
+                                                        IP_EVENT_STA_GOT_IP,
+                                                        &__qmsd_event_handler,
+                                                        NULL,
+                                                        &instance_got_ip));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(SC_EVENT,
+                                                        ESP_EVENT_ANY_ID,
+                                                        &__qmsd_event_handler,
+                                                        NULL,
+                                                        &instance_any_sc));                                                    
+
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
+    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+    ESP_ERROR_CHECK(esp_wifi_start() );
+
+    ESP_LOGI(TAG, "wifi_init_sta finished.");
+
+   
+}
+
 esp_err_t qmsd_wifi_sta_config(const char *ssid, const char *password, const char *bssid)
 {
     esp_err_t err = ESP_FAIL;
@@ -567,27 +634,26 @@ uint8_t qmsd_wifi_wait_connect(void)
     }
     return res;
 }
-
+#ifdef OLD_WIFI_INIT
 esp_err_t qmsd_wifi_init(bool auto_connect)
 {
     esp_err_t err = ESP_FAIL;
+
+    //Initialize NVS
+    qmsd_nvs_init();
     qmsd_wifi_event_group = xEventGroupCreate();
 
     ESP_ERROR_CHECK(esp_netif_init());
     esp_netif_sta = esp_netif_create_default_wifi_sta();
-    esp_netif_ap = esp_netif_create_default_wifi_ap();
+    // esp_netif_ap = esp_netif_create_default_wifi_ap();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    esp_event_handler_instance_t instance_any_wifi;
+    esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
     esp_event_handler_instance_t instance_any_sc;
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
-                                                        ESP_EVENT_ANY_ID,
-                                                        &__qmsd_event_handler,
-                                                        NULL,
-                                                        &instance_any_wifi));
+   ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, WIFI_EVENT_STA_START, &event_handler, NULL, &instance_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
                                                         IP_EVENT_STA_GOT_IP,
                                                         &__qmsd_event_handler,
@@ -612,3 +678,4 @@ esp_err_t qmsd_wifi_init(bool auto_connect)
 
     return ESP_OK;
 }
+#endif

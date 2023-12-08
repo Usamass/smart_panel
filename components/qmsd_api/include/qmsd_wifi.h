@@ -24,5 +24,7 @@ void qmsd_wifi_sc_stop(void);
 esp_err_t qmsd_wifi_get_ip(wifi_interface_t interface, char *ip, char *gw, char *netmask);
 esp_err_t qmsd_wifi_get_scan_result(uint16_t *number, wifi_ap_record_t *ap_records);
 esp_err_t qmsd_wifi_save_config(wifi_mode_t mode, wifi_interface_t interface);
+void smart_wifi_init();
+esp_err_t qmsd_wifi_scan(char *ssid, bool block);
 
 #endif
