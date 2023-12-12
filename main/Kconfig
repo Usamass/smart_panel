@@ -1,0 +1,6 @@
+menu "network authentication token"
+	config AUTH_TOKEN
+	    string
+	    prompt "Used to authenticate the device in the local network"
+	    default "AESD0900787898"
+    endmenu

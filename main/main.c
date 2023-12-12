@@ -29,7 +29,9 @@
 #include "qmsd_api.h"
 #include "qmsd_wifi.h"
 #include "qmsd_notifier.h"
+#include "net_auth.h"
 #include <esp_log.h>
+
 
 #define TAG "MAIN"
 #define NON_BLOCKING_SCAN 1
@@ -69,7 +71,7 @@ static struct qmsd_notifier_block g_nb = {
 
 void app_main(void)
 {
-    
+   
     printf("version: %s\n", QMSD_VERSION);
     qmsd_storage_init();
 
@@ -77,17 +79,34 @@ void app_main(void)
     qmsd_mod_init();
     qmsd_notifier_register(&g_nb);
 
-    // smart_wifi_init();
-    // qmsd_wifi_set_mode(WIFI_MODE_AP);
-    // qmsd_wifi_ap_config("esp32" , "esp32#1212");
     qmsd_server_init(LOCAL_HTTP_SERVER);
 
-    // qmsd_wifi_scan(NULL, NON_BLOCKING_SCAN);
-    //qmsd_wifi_sta_config("test-ssid", "test-pwd111", NULL);
 
     qmsd_set_init_cb(qmsd_ui_init_cb);
 
     qmsd_gui_init(0, DIR_INPUT);
     qmsd_control_init();
 }
+
+
+
+
+
+    // char* res = NULL;
+    // initialize_auth_storage();
+
+    // save_auth_token("AESD1234564");
+    // get_auth_token(res);
+
+    // free(res);
+
+
+    // smart_wifi_init();
+    // qmsd_wifi_set_mode(WIFI_MODE_AP);
+    // qmsd_wifi_ap_config("esp32" , "esp32#1212");
+    // qmsd_server_init(LOCAL_HTTP_SERVER);
+
+
+    // qmsd_wifi_scan(NULL, NON_BLOCKING_SCAN);
+    //qmsd_wifi_sta_config("test-ssid", "test-pwd111", NULL);
 

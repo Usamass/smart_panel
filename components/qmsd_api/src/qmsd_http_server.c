@@ -57,15 +57,12 @@ static esp_err_t hello_get_handler(httpd_req_t *req)
         free(buf);
     }
 
-    /* Read URL query string length and allocate memory for length + 1,
-     * extra byte for null termination */
     buf_len = httpd_req_get_url_query_len(req) + 1;
     if (buf_len > 1) {
         buf = malloc(buf_len);
         if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
             ESP_LOGI(TAG, "Found URL query => %s", buf);
             char param[32];
-            /* Get value of expected key from query string */
             if (httpd_query_key_value(buf, "query1", param, sizeof(param)) == ESP_OK) {
                 ESP_LOGI(TAG, "Found URL query parameter => query1=%s", param);
             }

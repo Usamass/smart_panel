@@ -10,6 +10,7 @@
 #include "freertos/task.h"
 #include "esp_freertos_hooks.h"
 #include "freertos/semphr.h"
+#include "esp_log.h"
 
 #define QMSD_STORAGE_PARTITION "qmsd_storage"
 
@@ -768,16 +769,16 @@ esp_err_t qmsd_nvs_get_str(const char*namespace, const char* key,char *output, s
 {
     nvs_handle_t my_handle;
     esp_err_t err = ESP_FAIL;
-
+  
     if (g_qmsd_nvs_sem) {
         if (pdTRUE == xSemaphoreTake(g_qmsd_nvs_sem, portMAX_DELAY)) {
             err = nvs_open_from_partition(QMSD_STORAGE_PARTITION, namespace, NVS_READWRITE, &my_handle);
             if (err != ESP_OK) {
-                printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+                ESP_LOGI("get_token","Error (%s) opening NVS handle!\n", esp_err_to_name(err));
                 xSemaphoreGive(g_qmsd_nvs_sem);
                 return err;
             } else {
-                err = nvs_get_str(my_handle, key, output, &size);
+                err = nvs_get_str(my_handle, key , output , &size);
                 nvs_close(my_handle);
                 xSemaphoreGive(g_qmsd_nvs_sem);
                 return err;
