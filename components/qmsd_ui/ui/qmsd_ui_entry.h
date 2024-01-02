@@ -1,5 +1,5 @@
-#ifndef QMSD_UI_ENTRY_H
-#define QMSD_UI_ENTRY_H
+#ifndef QM_UI_ENTRY_H
+#define QM_UI_ENTRY_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -7,22 +7,48 @@ extern "C" {
 
 #include <stdio.h>
 #include <stdlib.h>
+
 #include "lvgl/lvgl.h"
 #include "qmsd_lang.h"
 #include "qmsd_gui.h"
-
 LV_FONT_DECLARE(ali_font_16);
-LV_FONT_DECLARE(ali_font_58);
-LV_IMG_DECLARE(img1639365041009_png);
+
+LV_IMG_DECLARE(imgimg_cir_bottom_png);
+LV_IMG_DECLARE(imginstructions_png);
+LV_IMG_DECLARE(imgbbb_png);
+LV_IMG_DECLARE(imgerror_png);
+LV_IMG_DECLARE(imgimg_left_light_png);
+LV_IMG_DECLARE(imgimg_light_left_png);
+LV_IMG_DECLARE(imgimg_light_png);
+LV_IMG_DECLARE(imgimg_load_png);
+LV_IMG_DECLARE(imgimg_up_line_png);
+LV_IMG_DECLARE(imgaaa_png);
+LV_IMG_DECLARE(imglight_round_png);
+
+/*
+* declear screen_main
+*/
+extern lv_obj_t * screen_main;
+extern lv_obj_t * gauge_4y50;
+extern lv_obj_t * image_lKms;
+extern lv_obj_t * image_CP93;
+extern lv_obj_t * image_nVuv;
+extern lv_obj_t * image_kUYv;
+void screen_main_build(void);
+void screen_main_show(void);
+void screen_main_delete(void);
+
+extern lv_obj_t * g_kb;
 
 void qmsd_ui_entry(void);
-lv_obj_t *qmsd_get_screen(const char *name);
-lv_obj_t *qmsd_get_widget(const char *w_name);
-const char *qmsd_get_obj_name(lv_obj_t *obj);
+void qmsd_ui_loop(void);
 lv_img_src_t *qmsd_get_img(const char *w_name);
 lv_font_t *qmsd_get_font(const char *w_name);
+
+void g_create_kb_ifneeded(void);
+void g_show_kb(void);
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
 
-#endif /*QMSD_UI_ENTRY_H*/
+#endif /*QM_UI_ENTRY_H*/

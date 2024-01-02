@@ -79,7 +79,7 @@ void app_main(void)
     qmsd_mod_init();
     qmsd_notifier_register(&g_nb);
 
-    qmsd_server_init(LOCAL_HTTP_SERVER);
+    // qmsd_server_init(LOCAL_HTTP_SERVER);
 
 
     qmsd_set_init_cb(qmsd_ui_init_cb);
